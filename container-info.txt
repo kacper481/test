@@ -1,0 +1,2 @@
+Container ID: container_01BSg1smH6Vco5YQR6WpKksd--claude_code_remote--5c8796
+Machine ID: 1fedf2a76df94f808de522c6d6b831a2
