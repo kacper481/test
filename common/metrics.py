@@ -8,25 +8,21 @@ from __future__ import annotations
 from opentelemetry import metrics
 
 
-_meter = metrics.get_meter("app.business")
+_meter = metrics.get_meter("app.business", schema_url="https://opentelemetry.io/schemas/1.11.0")
 
-items_created = _meter.create_counter(
-    name="items_created_total",
-    description="Total number of items created.",
-)
 
-users_created = _meter.create_counter(
-    name="users_created_total",
-    description="Total number of users created.",
-)
+def _counter(name: str, description: str):
+    return _meter.create_counter(name=name, description=description)
 
-opensearch_ops = _meter.create_counter(
-    name="opensearch_operations_total",
-    description="OpenSearch operations performed, labeled by operation and index.",
-)
 
-search_result_size = _meter.create_histogram(
-    name="search_result_size",
-    description="Number of hits returned by a search.",
-    unit="hits",
+def _histogram(name: str, description: str, unit: str):
+    return _meter.create_histogram(name=name, description=description, unit=unit)
+
+
+items_created = _counter("items_created_total", "Total number of items created.")
+users_created = _counter("users_created_total", "Total number of users created.")
+opensearch_ops = _counter(
+    "opensearch_operations_total",
+    "OpenSearch operations performed, labeled by operation and index.",
 )
+search_result_size = _histogram("search_result_size", "Number of hits returned by a search.", "hits")
