@@ -10,6 +10,7 @@ CHAOS_USERS_GET_ERROR_RATE=0.2     # 20% chance users.get returns 500
 CHAOS_OS_INDEX_SLOW_MS=150         # add latency to every OpenSearch index op
 CHAOS_GATEWAY_VALIDATE_MS=80       # add latency to gateway's owner-validation hop
 """
+
 from __future__ import annotations
 
 import os
@@ -18,7 +19,6 @@ import time
 
 from fastapi import HTTPException
 from opentelemetry import trace
-
 
 _tracer = trace.get_tracer(__name__)
 

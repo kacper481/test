@@ -7,6 +7,7 @@ This service has no HTTP API. It exists to demonstrate:
 
 Run with:  python -m services.notifications_svc.worker
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -19,7 +20,6 @@ from common import metrics as m
 from common.logging import configure_logging, get_logger
 from common.settings import NotificationsSvcSettings
 from common.telemetry import configure_telemetry
-
 
 _tracer = trace.get_tracer(__name__)
 
@@ -65,9 +65,7 @@ async def main() -> None:
     channel = await connection.channel()
     await channel.set_qos(prefetch_count=10)
 
-    exchange = await channel.declare_exchange(
-        "events", aio_pika.ExchangeType.TOPIC, durable=True
-    )
+    exchange = await channel.declare_exchange("events", aio_pika.ExchangeType.TOPIC, durable=True)
     queue = await channel.declare_queue("notifications", durable=True)
     await queue.bind(exchange, routing_key="items.created")
 

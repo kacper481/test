@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from opensearchpy import OpenSearch
 from opentelemetry import trace
 
-from common import chaos, metrics as m
+from common import chaos
+from common import metrics as m
 
 INDEX = "items"
 MAPPINGS = {
@@ -29,7 +29,7 @@ def create_item(client: OpenSearch, title: str, description: str, owner_id: str)
             "title": title,
             "description": description,
             "owner_id": owner_id,
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
         }
         span.set_attribute("item.id", item_id)
         span.set_attribute("item.owner_id", owner_id)
@@ -49,9 +49,7 @@ def get_item(client: OpenSearch, item_id: str) -> dict:
         return {"id": resp["_id"], **resp["_source"]}
 
 
-def search_items(
-    client: OpenSearch, q: Optional[str], owner_id: Optional[str]
-) -> dict:
+def search_items(client: OpenSearch, q: str | None, owner_id: str | None) -> dict:
     with _tracer.start_as_current_span("items.search") as span:
         span.set_attribute("search.query", q or "")
         if owner_id:

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from opensearchpy import OpenSearch
 from opentelemetry import trace
 
-from common import chaos, metrics as m
+from common import chaos
+from common import metrics as m
 
 INDEX = "users"
 MAPPINGS = {
@@ -26,7 +27,7 @@ def create_user(client: OpenSearch, name: str, email: str | None) -> dict:
         doc = {
             "name": name,
             "email": email,
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
         }
         span.set_attribute("user.id", user_id)
         client.index(index=INDEX, id=user_id, body=doc, refresh="wait_for")
@@ -51,8 +52,4 @@ def mget_users(client: OpenSearch, ids: list[str]) -> list[dict]:
             return []
         resp = client.mget(index=INDEX, body={"ids": ids})
         m.opensearch_ops.add(1, {"operation": "mget", "index": INDEX})
-        return [
-            {"id": doc["_id"], **doc["_source"]}
-            for doc in resp["docs"]
-            if doc.get("found")
-        ]
+        return [{"id": doc["_id"], **doc["_source"]} for doc in resp["docs"] if doc.get("found")]

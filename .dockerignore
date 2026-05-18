@@ -1,0 +1,32 @@
+# VCS
+.git
+.gitignore
+.gitkeep
+
+# Caches & build artifacts
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.egg-info
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.venv
+venv
+
+# Editor / IDE
+.idea
+.vscode
+*.swp
+
+# Tests and dev-only artifacts not needed in image
+tests
+docs
+.pre-commit-config.yaml
+LEARN.md
+LICENSE
+README.md
+.env
+.env.example
+.dockerignore

@@ -3,6 +3,7 @@
 Note: `requests` instrumentation (set up in `common.telemetry`) automatically
 creates child spans for every OpenSearch HTTP call — no manual tracing here.
 """
+
 from __future__ import annotations
 
 from urllib.parse import urlparse

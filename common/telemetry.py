@@ -6,6 +6,7 @@ metrics are exported via OTLP; log records get trace_id/span_id injected.
 
 `app` may be None for non-FastAPI services (e.g. the notifications worker).
 """
+
 from __future__ import annotations
 
 import logging
@@ -21,7 +22,6 @@ from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
 from opentelemetry.sdk.resources import SERVICE_NAME, Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
-
 
 _INITIALIZED = False
 
@@ -51,6 +51,7 @@ def configure_telemetry(app, service_name: str, otlp_endpoint: str) -> None:
 
         try:
             from opentelemetry.instrumentation.aio_pika import AioPikaInstrumentor
+
             AioPikaInstrumentor().instrument()
         except Exception:
             pass  # aio-pika instrumentation is optional
@@ -59,4 +60,5 @@ def configure_telemetry(app, service_name: str, otlp_endpoint: str) -> None:
 
     if app is not None:
         from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+
         FastAPIInstrumentor.instrument_app(app)

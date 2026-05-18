@@ -6,6 +6,7 @@ from common.logging import configure_logging, get_logger
 from common.opensearch import ensure_index, make_client
 from common.settings import ItemsSvcSettings
 from common.telemetry import configure_telemetry
+
 from .routes import router
 from .store import INDEX, MAPPINGS
 

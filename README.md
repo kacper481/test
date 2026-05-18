@@ -1,8 +1,38 @@
 # Distributed FastAPI — Learning Environment for OpenTelemetry
 
+[![tests](https://github.com/kacper481/test/actions/workflows/test.yml/badge.svg)](https://github.com/kacper481/test/actions/workflows/test.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+
 A self-contained, multi-service Python system designed for **learning the workflow of observability**: metrics → traces → logs, end-to-end. Every piece is real (no toy stubs), every part is instrumented with OpenTelemetry, and a built-in load generator + planted bugs let you practice debugging like in production.
 
 > **📚 Start with [LEARN.md](./LEARN.md)** — 8 progressive exercises that teach the actual workflow. The rest of this file is a reference.
+
+> ⚠️ **Development environment only.** OpenSearch security plugin is disabled, RabbitMQ uses default `guest`/`guest` credentials, and Grafana allows anonymous admin access — all by design for a frictionless local learning loop. **Never run this configuration in production or expose it publicly.**
+
+## What you'll see
+
+Once the stack is up and the load generator has run for ~30 seconds, you can drill from dashboards down into individual traces:
+
+```
+                       Grafana                                  Jaeger
+                   ───────────────                          ───────────────
+  Request rate by service          ┐       POST /api/items                       (gateway)
+  p95 latency  ────────►  spike    │       ├── gateway.validate_owner
+  ────────────────────────► click  └──►    │   └── HTTP GET /users/{id}          (gateway → users-svc)
+                                           │       └── users.get
+                                           │           └── HTTP GET .../users/_doc/...   (→ OpenSearch)
+                                           ├── HTTP POST /items                  (gateway → items-svc)
+                                           │   └── items.create
+                                           │       └── HTTP PUT .../items/_doc/...
+                                           └── publish items.created             (gateway → RabbitMQ)
+                                               └── consume items.created         (notifications-svc)
+                                                   └── send_email
+```
+
+One logical request → 4 services → traces, metrics, and structured logs all correlated by `trace_id`.
+
+*(Screenshots of Jaeger & Grafana go in [`docs/screenshots/`](./docs/screenshots/) — see the README in that folder for capture instructions.)*
 
 ## Architecture
 

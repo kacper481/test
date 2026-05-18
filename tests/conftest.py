@@ -1,4 +1,5 @@
 """Configure test environment — disable OTLP export so tests are silent."""
+
 import os
 
 # Point OTLP to a non-existent endpoint so exporters fail instantly
@@ -11,4 +12,5 @@ os.environ.setdefault("USERS_SVC_URL", "http://localhost:8002")
 # Suppress the OTel background-thread teardown noise that appears after the
 # test process exits (PeriodicExportingMetricReader flushing to a dead endpoint).
 import logging
+
 logging.getLogger("opentelemetry").setLevel(logging.CRITICAL)

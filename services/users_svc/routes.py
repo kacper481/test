@@ -5,6 +5,7 @@ from opensearchpy import NotFoundError
 from pydantic import BaseModel, EmailStr, Field
 
 from common.logging import get_logger
+
 from . import store
 
 log = get_logger("users_svc.routes")
@@ -26,7 +27,7 @@ def health(request: Request):
         info = request.app.state.os_client.info()
         return {"status": "ok", "opensearch_version": info["version"]["number"]}
     except Exception as exc:
-        raise HTTPException(status_code=503, detail=f"OpenSearch unavailable: {exc}")
+        raise HTTPException(status_code=503, detail=f"OpenSearch unavailable: {exc}") from exc
 
 
 @router.post("/users", status_code=201)
@@ -41,7 +42,7 @@ def get_user(user_id: str, request: Request):
     try:
         return store.get_user(request.app.state.os_client, user_id)
     except NotFoundError:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail="User not found") from None
 
 
 @router.post("/users/_mget")

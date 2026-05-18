@@ -1,4 +1,4 @@
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
 
@@ -6,6 +6,7 @@ from common.http_client import make_client
 from common.logging import configure_logging, get_logger
 from common.settings import GatewaySettings
 from common.telemetry import configure_telemetry
+
 from .events import EventPublisher
 from .routes import router
 
@@ -37,10 +38,8 @@ def create_app() -> FastAPI:
         )
         yield
         await app.state.http.aclose()
-        try:
+        with suppress(Exception):
             await app.state.publisher.close()
-        except Exception:
-            pass
         log.info("service.stopped", service=settings.service_name)
 
     app = FastAPI(title="gateway", lifespan=lifespan)

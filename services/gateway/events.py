@@ -9,6 +9,7 @@ Demonstrates manual trace context propagation across an async boundary:
 The `AioPikaInstrumentor` auto-instruments aio-pika as well, but doing it
 manually here makes the propagation mechanism visible.
 """
+
 from __future__ import annotations
 
 import json

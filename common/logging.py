@@ -4,6 +4,7 @@ Every log line is emitted as a single-line JSON object including:
 - timestamp, level, event, service.name
 - trace_id, span_id (injected by opentelemetry-instrumentation-logging)
 """
+
 from __future__ import annotations
 
 import logging

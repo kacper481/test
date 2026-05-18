@@ -3,13 +3,13 @@
 All OpenSearch and inter-service HTTP calls are mocked so no running
 infrastructure is needed.
 """
+
 from __future__ import annotations
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from fastapi.testclient import TestClient
-
 
 # ---------------------------------------------------------------------------
 # Shared fixtures
@@ -29,7 +29,11 @@ ITEM_DOC = {
 
 USER_DOC = {
     "_id": "user-1",
-    "_source": {"name": "alice", "email": "alice@example.com", "created_at": "2026-01-01T00:00:00+00:00"},
+    "_source": {
+        "name": "alice",
+        "email": "alice@example.com",
+        "created_at": "2026-01-01T00:00:00+00:00",
+    },
 }
 
 SEARCH_RESP = {
@@ -46,11 +50,9 @@ MGET_RESP = {"docs": [{**USER_DOC, "found": True}]}
 def _make_os_mock() -> MagicMock:
     m = MagicMock()
     m.info.return_value = OS_INFO
-    m.indices.exists.return_value = True     # skip index creation
+    m.indices.exists.return_value = True  # skip index creation
     m.index.return_value = {"_id": "item-1", "result": "created"}
-    m.get.side_effect = lambda index, id, **_: (
-        ITEM_DOC if index == "items" else USER_DOC
-    )
+    m.get.side_effect = lambda index, id, **_: ITEM_DOC if index == "items" else USER_DOC
     m.search.return_value = SEARCH_RESP
     m.mget.return_value = MGET_RESP
     return m
@@ -60,6 +62,7 @@ def _make_os_mock() -> MagicMock:
 # items-svc
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture()
 def items_client():
     os_mock = _make_os_mock()
@@ -68,7 +71,9 @@ def items_client():
         patch("common.opensearch.ensure_index"),
     ):
         import importlib
+
         import services.items_svc.main as m
+
         importlib.reload(m)
         app = m.create_app()
         with TestClient(app, raise_server_exceptions=True) as c:
@@ -108,13 +113,15 @@ def test_items_search(items_client):
 
 def test_items_create_missing_owner(items_client):
     r = items_client.post("/items", json={"title": "x"})
-    assert r.status_code == 422   # validation error: owner_id required
+    assert r.status_code == 422  # validation error: owner_id required
 
 
 def test_items_get_not_found(items_client):
     from opensearchpy import NotFoundError
 
-    with patch("services.items_svc.store.get_item", side_effect=NotFoundError(404, "not found", {})):
+    with patch(
+        "services.items_svc.store.get_item", side_effect=NotFoundError(404, "not found", {})
+    ):
         r = items_client.get("/items/missing")
     assert r.status_code == 404
 
@@ -122,6 +129,7 @@ def test_items_get_not_found(items_client):
 # ---------------------------------------------------------------------------
 # users-svc
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture()
 def users_client():
@@ -132,7 +140,9 @@ def users_client():
         patch("common.opensearch.ensure_index"),
     ):
         import importlib
+
         import services.users_svc.main as m
+
         importlib.reload(m)
         app = m.create_app()
         with TestClient(app, raise_server_exceptions=True) as c:
@@ -169,7 +179,10 @@ def test_users_mget(users_client):
 
 def test_users_get_not_found(users_client):
     from opensearchpy import NotFoundError
-    with patch("services.users_svc.store.get_user", side_effect=NotFoundError(404, "not found", {})):
+
+    with patch(
+        "services.users_svc.store.get_user", side_effect=NotFoundError(404, "not found", {})
+    ):
         r = users_client.get("/users/missing")
     assert r.status_code == 404
 
@@ -251,7 +264,9 @@ def gw_client():
         patch("services.gateway.main.EventPublisher", return_value=pub_mock),
     ):
         import importlib
+
         import services.gateway.main as m
+
         importlib.reload(m)
         app = m.create_app()
         with TestClient(app, raise_server_exceptions=True) as c:
@@ -290,7 +305,7 @@ def test_gw_get_item(gw_client):
     assert r.status_code == 200
     body = r.json()
     assert body["title"] == "hello"
-    assert body["owner"]["name"] == "alice"   # owner hydrated
+    assert body["owner"]["name"] == "alice"  # owner hydrated
 
 
 def test_gw_search_items(gw_client):
@@ -298,17 +313,20 @@ def test_gw_search_items(gw_client):
     assert r.status_code == 200
     body = r.json()
     assert body["total"] == 1
-    assert body["hits"][0]["owner"]["name"] == "alice"   # owner hydrated
+    assert body["hits"][0]["owner"]["name"] == "alice"  # owner hydrated
 
 
 # ---------------------------------------------------------------------------
 # chaos module
 # ---------------------------------------------------------------------------
 
+
 def test_chaos_delay_skipped_when_unset(monkeypatch):
     from common import chaos
+
     monkeypatch.delenv("CHAOS_TEST_DELAY", raising=False)
     import time
+
     start = time.monotonic()
     chaos.maybe_delay("CHAOS_TEST_DELAY")
     assert time.monotonic() - start < 0.01
@@ -316,16 +334,20 @@ def test_chaos_delay_skipped_when_unset(monkeypatch):
 
 def test_chaos_delay_sleeps_when_set(monkeypatch):
     from common import chaos
+
     monkeypatch.setenv("CHAOS_TEST_DELAY", "50")
     import time
+
     start = time.monotonic()
     chaos.maybe_delay("CHAOS_TEST_DELAY")
     assert time.monotonic() - start >= 0.04
 
 
 def test_chaos_fail_at_100_percent(monkeypatch):
-    from common import chaos
     from fastapi import HTTPException
+
+    from common import chaos
+
     monkeypatch.setenv("CHAOS_TEST_FAIL", "1.0")
     with pytest.raises(HTTPException) as exc_info:
         chaos.maybe_fail("CHAOS_TEST_FAIL")
@@ -334,6 +356,7 @@ def test_chaos_fail_at_100_percent(monkeypatch):
 
 def test_chaos_fail_at_zero_never_fires(monkeypatch):
     from common import chaos
+
     monkeypatch.setenv("CHAOS_TEST_FAIL", "0")
     for _ in range(20):
         chaos.maybe_fail("CHAOS_TEST_FAIL")  # must never raise

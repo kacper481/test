@@ -5,6 +5,7 @@
 - injects W3C `traceparent` + `baggage` headers so the downstream service
   joins the same trace
 """
+
 from __future__ import annotations
 
 import httpx

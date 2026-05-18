@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Request
 from opentelemetry import baggage, context, trace
@@ -31,6 +30,7 @@ class UserCreate(BaseModel):
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _attach_request_baggage(request: Request) -> object:
     """Attach a request.id to OTel baggage so downstreams can see it on every span."""
     request_id = request.headers.get("x-request-id") or str(uuid.uuid4())
@@ -44,6 +44,7 @@ def _attach_request_baggage(request: Request) -> object:
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
+
 
 @router.get("/health")
 async def health(request: Request):
@@ -88,9 +89,7 @@ async def create_user(payload: UserCreate, request: Request):
 async def get_user(user_id: str, request: Request):
     token = _attach_request_baggage(request)
     try:
-        resp = await request.app.state.http.get(
-            f"{request.app.state.users_url}/users/{user_id}"
-        )
+        resp = await request.app.state.http.get(f"{request.app.state.users_url}/users/{user_id}")
         if resp.status_code == 404:
             raise HTTPException(404, "User not found")
         resp.raise_for_status()
@@ -109,9 +108,7 @@ async def create_item(payload: ItemCreate, request: Request):
         with _tracer.start_as_current_span("gateway.validate_owner") as span:
             span.set_attribute("item.owner_id", payload.owner_id)
             chaos.maybe_delay("CHAOS_GATEWAY_VALIDATE_MS")
-            owner_resp = await http.get(
-                f"{request.app.state.users_url}/users/{payload.owner_id}"
-            )
+            owner_resp = await http.get(f"{request.app.state.users_url}/users/{payload.owner_id}")
             if owner_resp.status_code == 404:
                 raise HTTPException(400, f"Unknown owner_id: {payload.owner_id}")
             owner_resp.raise_for_status()
@@ -162,8 +159,8 @@ async def get_item(item_id: str, request: Request):
 @router.get("/api/items")
 async def search_items(
     request: Request,
-    q: Optional[str] = None,
-    owner_id: Optional[str] = None,
+    q: str | None = None,
+    owner_id: str | None = None,
 ):
     """Search items, then hydrate owners in a single batch call."""
     token = _attach_request_baggage(request)
@@ -171,9 +168,7 @@ async def search_items(
         http = request.app.state.http
         params = {k: v for k, v in {"q": q, "owner_id": owner_id}.items() if v}
 
-        search_resp = await http.get(
-            f"{request.app.state.items_url}/items", params=params
-        )
+        search_resp = await http.get(f"{request.app.state.items_url}/items", params=params)
         search_resp.raise_for_status()
         result = search_resp.json()
 

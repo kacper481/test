@@ -9,6 +9,7 @@ GATEWAY_URL   Base URL (default http://gateway:8000)
 RPS           Requests per second (default 5)
 SCENARIO      One of: steady (default), read_heavy, spike, write_heavy
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -18,21 +19,29 @@ import time
 
 import httpx
 
-
 GATEWAY = os.getenv("GATEWAY_URL", "http://gateway:8000")
 RPS = float(os.getenv("RPS", "5"))
 SCENARIO = os.getenv("SCENARIO", "steady")
 
 # action -> weight, per scenario
 WEIGHTS = {
-    "steady":       {"create_user": 1, "create_item": 4, "search": 5, "get_item": 3},
-    "read_heavy":   {"create_user": 1, "create_item": 1, "search": 10, "get_item": 8},
-    "write_heavy":  {"create_user": 3, "create_item": 8, "search": 2, "get_item": 1},
+    "steady": {"create_user": 1, "create_item": 4, "search": 5, "get_item": 3},
+    "read_heavy": {"create_user": 1, "create_item": 1, "search": 10, "get_item": 8},
+    "write_heavy": {"create_user": 3, "create_item": 8, "search": 2, "get_item": 1},
     # 'spike' is dynamic — handled below
 }
 
-TITLES = ["red shoe", "blue hat", "green shirt", "wool socks", "fancy bag",
-          "leather belt", "silk tie", "linen pants", "cotton hoodie"]
+TITLES = [
+    "red shoe",
+    "blue hat",
+    "green shirt",
+    "wool socks",
+    "fancy bag",
+    "leather belt",
+    "silk tie",
+    "linen pants",
+    "cotton hoodie",
+]
 DESCRIPTIONS = ["very nice", "limited edition", "vintage", "handmade", "imported"]
 
 
@@ -90,7 +99,7 @@ async def run() -> None:
                     break
             except Exception:
                 pass
-            print(f"[loadgen] waiting for gateway ({attempt+1}/60)...")
+            print(f"[loadgen] waiting for gateway ({attempt + 1}/60)...")
             await asyncio.sleep(2)
 
         # Seed users
@@ -126,7 +135,7 @@ async def run() -> None:
                 sent += 1
                 if sent % 50 == 0:
                     elapsed = time.monotonic() - started
-                    print(f"[loadgen] {sent} requests in {elapsed:.0f}s ({sent/elapsed:.1f}/s)")
+                    print(f"[loadgen] {sent} requests in {elapsed:.0f}s ({sent / elapsed:.1f}/s)")
             except Exception as exc:
                 print(f"[loadgen] error: {type(exc).__name__}: {exc}")
 

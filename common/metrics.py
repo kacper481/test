@@ -3,10 +3,10 @@
 The `FastAPIInstrumentor` already records standard HTTP server metrics. These
 are the *business* metrics our app cares about.
 """
+
 from __future__ import annotations
 
 from opentelemetry import metrics
-
 
 _meter = metrics.get_meter("app.business", schema_url="https://opentelemetry.io/schemas/1.11.0")
 
@@ -25,5 +25,7 @@ opensearch_ops = _counter(
     "opensearch_operations",
     "OpenSearch operations performed, labeled by operation and index.",
 )
-search_result_size = _histogram("search_result_size", "Number of hits returned by a search.", "hits")
+search_result_size = _histogram(
+    "search_result_size", "Number of hits returned by a search.", "hits"
+)
 notifications_sent = _counter("notifications_sent", "Async notifications processed by the worker.")
