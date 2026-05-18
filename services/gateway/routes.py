@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Request
 from opentelemetry import baggage, context, trace
 from pydantic import BaseModel, EmailStr, Field
 
+from common import chaos
 from common.logging import get_logger
 
 log = get_logger("gateway.routes")
@@ -107,6 +108,7 @@ async def create_item(payload: ItemCreate, request: Request):
 
         with _tracer.start_as_current_span("gateway.validate_owner") as span:
             span.set_attribute("item.owner_id", payload.owner_id)
+            chaos.maybe_delay("CHAOS_GATEWAY_VALIDATE_MS")
             owner_resp = await http.get(
                 f"{request.app.state.users_url}/users/{payload.owner_id}"
             )
@@ -119,6 +121,13 @@ async def create_item(payload: ItemCreate, request: Request):
         )
         create_resp.raise_for_status()
         item = create_resp.json()
+
+        # Fire-and-forget event; trace context is propagated in message headers
+        try:
+            await request.app.state.publisher.publish("items.created", item)
+        except Exception as exc:
+            log.warning("publish.failed", error=str(exc))
+
         log.info("gateway.item.created", item_id=item["id"], owner_id=payload.owner_id)
         return item
     finally:

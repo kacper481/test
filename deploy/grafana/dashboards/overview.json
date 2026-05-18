@@ -1,0 +1,105 @@
+{
+  "title": "Distributed FastAPI — Overview",
+  "uid": "fastapi-overview",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "10s",
+  "time": {"from": "now-15m", "to": "now"},
+  "timepicker": {},
+  "tags": ["fastapi", "otel"],
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Request rate (req/s) by service",
+      "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "sum by (service_name) (rate(app_http_server_duration_milliseconds_count[1m]))",
+          "legendFormat": "{{service_name}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "reqps"}}
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "p95 latency (ms) by service & route",
+      "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (service_name, http_route, le) (rate(app_http_server_duration_milliseconds_bucket[5m])))",
+          "legendFormat": "{{service_name}} {{http_route}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "ms"}}
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Error rate (5xx) by service",
+      "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "sum by (service_name) (rate(app_http_server_duration_milliseconds_count{http_status_code=~\"5..\"}[1m]))",
+          "legendFormat": "{{service_name}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "reqps"}}
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Items / users created (rate per minute)",
+      "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"expr": "rate(app_items_created_total[1m]) * 60", "legendFormat": "items", "refId": "A"},
+        {"expr": "rate(app_users_created_total[1m]) * 60", "legendFormat": "users", "refId": "B"},
+        {"expr": "rate(app_notifications_sent_total[1m]) * 60", "legendFormat": "notifications", "refId": "C"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "ops/min"}}
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "OpenSearch operations by op + index",
+      "gridPos": {"x": 0, "y": 16, "w": 12, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "sum by (operation, index) (rate(app_opensearch_operations_total[1m]))",
+          "legendFormat": "{{operation}} {{index}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "ops"}}
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Search result size (p50/p95)",
+      "gridPos": {"x": 12, "y": 16, "w": 12, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(app_search_result_size_hits_bucket[5m])))",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(app_search_result_size_hits_bucket[5m])))",
+          "legendFormat": "p95",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "hits"}}
+    }
+  ]
+}

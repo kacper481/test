@@ -7,7 +7,7 @@ from typing import Optional
 from opensearchpy import OpenSearch
 from opentelemetry import trace
 
-from common import metrics as m
+from common import chaos, metrics as m
 
 INDEX = "items"
 MAPPINGS = {
@@ -34,6 +34,7 @@ def create_item(client: OpenSearch, title: str, description: str, owner_id: str)
         span.set_attribute("item.id", item_id)
         span.set_attribute("item.owner_id", owner_id)
 
+        chaos.maybe_delay("CHAOS_OS_INDEX_SLOW_MS")
         client.index(index=INDEX, id=item_id, body=doc, refresh="wait_for")
         m.opensearch_ops.add(1, {"operation": "index", "index": INDEX})
         m.items_created.add(1)
@@ -67,6 +68,7 @@ def search_items(
             "aggs": {"by_owner": {"terms": {"field": "owner_id", "size": 10}}},
             "size": 50,
         }
+        chaos.maybe_delay("CHAOS_ITEMS_SEARCH_MS")
         resp = client.search(index=INDEX, body=body)
         m.opensearch_ops.add(1, {"operation": "search", "index": INDEX})
 

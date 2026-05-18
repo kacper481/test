@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from opensearchpy import OpenSearch
 from opentelemetry import trace
 
-from common import metrics as m
+from common import chaos, metrics as m
 
 INDEX = "users"
 MAPPINGS = {
@@ -38,6 +38,7 @@ def create_user(client: OpenSearch, name: str, email: str | None) -> dict:
 def get_user(client: OpenSearch, user_id: str) -> dict:
     with _tracer.start_as_current_span("users.get") as span:
         span.set_attribute("user.id", user_id)
+        chaos.maybe_fail("CHAOS_USERS_GET_ERROR_RATE", detail="chaos: synthetic users.get failure")
         resp = client.get(index=INDEX, id=user_id)
         m.opensearch_ops.add(1, {"operation": "get", "index": INDEX})
         return {"id": resp["_id"], **resp["_source"]}

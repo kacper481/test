@@ -1,73 +1,115 @@
-# Distributed FastAPI + Full OpenTelemetry Stack
+# Distributed FastAPI — Learning Environment for OpenTelemetry
 
-A 3-service Python system instrumented end-to-end with OpenTelemetry traces, metrics, and structured logs — all backed by OpenSearch and observable in Jaeger + Prometheus.
+A self-contained, multi-service Python system designed for **learning the workflow of observability**: metrics → traces → logs, end-to-end. Every piece is real (no toy stubs), every part is instrumented with OpenTelemetry, and a built-in load generator + planted bugs let you practice debugging like in production.
+
+> **📚 Start with [LEARN.md](./LEARN.md)** — 8 progressive exercises that teach the actual workflow. The rest of this file is a reference.
 
 ## Architecture
 
 ```
-                       ┌──────────────────┐
-                       │     gateway      │ :8000  (public API)
-                       └────────┬─────────┘
-                                │ httpx (OTel-instrumented)
-                ┌───────────────┴───────────────┐
-                ▼                               ▼
-        ┌──────────────┐                ┌──────────────┐
-        │  items-svc   │ :8001          │  users-svc   │ :8002
-        └──────┬───────┘                └──────┬───────┘
-               │                                │
-               └────────────────┬───────────────┘
-                                ▼
-                        ┌──────────────┐
-                        │  OpenSearch  │ :9200
-                        └──────────────┘
+                       ┌────────────────────┐
+   loadgen ─────────►  │      gateway       │ :8000  (public API)
+                       └─────┬──────────┬───┘
+                             │ httpx    │ aio-pika publish (items.created)
+              ┌──────────────┘          ▼
+              ▼                   ┌──────────────┐       ┌─────────────────────┐
+       ┌──────────────┐           │   RabbitMQ   │ ◄──── │ notifications-svc   │
+       │  items-svc   │ :8001     └──────────────┘       │ (async consumer)    │
+       └──────┬───────┘                                  └─────────────────────┘
+              │
+       ┌──────────────┐
+       │  users-svc   │ :8002
+       └──────┬───────┘
+              ▼
+       ┌──────────────┐
+       │  OpenSearch  │ :9200
+       └──────────────┘
 
-       traces/metrics                logs (with trace_id)
-              │                              │
-              ▼                              ▼
-     ┌──────────────────┐              docker logs
-     │ OTel Collector   │ :4317
-     └──┬───────────┬───┘
-        ▼           ▼
-   ┌────────┐  ┌────────────┐
-   │ Jaeger │  │ Prometheus │
-   │ :16686 │  │  :9090     │
-   └────────┘  └────────────┘
+   traces ───────────────►  ┌──────────────────┐  ──── traces ──►  Jaeger :16686
+   metrics ──────────────►  │  OTel Collector  │
+   (all 4 services)         └──────────────────┘  ──── metrics ─►  Prometheus :9090
+                                                                          │
+                                                                          ▼
+                                                                   Grafana :3001
+                                                                   (pre-built dashboard)
 ```
 
-## Quick start
+## Quickstart
 
 ```bash
 docker compose -f deploy/docker-compose.yml up --build -d
 ```
 
-Wait ~30s for OpenSearch to become healthy, then:
+After ~45s everything is up and the load generator is sending traffic. Then open:
+
+| Tool | URL | Notes |
+|---|---|---|
+| Grafana | http://localhost:3001 | Pre-built "Distributed FastAPI — Overview" dashboard |
+| Jaeger | http://localhost:16686 | Select service `gateway`, click *Find Traces* |
+| Prometheus | http://localhost:9090 | Raw metrics + PromQL |
+| RabbitMQ | http://localhost:15672 | `guest` / `guest` — see queue depths |
+| Gateway docs | http://localhost:8000/docs | Try requests manually |
+
+Stop everything: `docker compose -f deploy/docker-compose.yml down`.
+
+## What's in here
+
+| Path | Purpose |
+|---|---|
+| `services/gateway/` | Public API, fans out to downstreams, publishes events |
+| `services/items_svc/` | Items CRUD + search with aggregations |
+| `services/users_svc/` | Users CRUD + batch mget |
+| `services/notifications_svc/` | RabbitMQ consumer, demonstrates async trace propagation |
+| `common/telemetry.py` | OTel SDK bootstrap (~50 lines, does traces + metrics + log correlation) |
+| `common/logging.py` | structlog JSON, auto-injects `trace_id` / `span_id` |
+| `common/chaos.py` | Env-var-toggled latency + error injection for exercises |
+| `common/metrics.py` | Custom business counters / histograms |
+| `tools/loadgen.py` | Continuous traffic generator (scenarios: steady / spike / read_heavy / write_heavy) |
+| `deploy/` | docker-compose, Dockerfile, OTel collector config, Prometheus config, Grafana provisioning + dashboard |
+| `tests/` | Pytest suite (18 tests, fully mocked, run with `pytest`) |
+| `LEARN.md` | **The exercises — start here** |
+
+## Manual interaction
 
 ```bash
-# 1. Create a user
+# Health checks
+curl localhost:8000/health
+
+# Create a user, then an item
 USER=$(curl -s -X POST localhost:8000/api/users \
   -H 'Content-Type: application/json' \
-  -d '{"name":"alice","email":"alice@example.com"}' | jq -r .id)
+  -d '{"name":"alice","email":"a@x.com"}' | jq -r .id)
 
-# 2. Create an item owned by that user (gateway validates owner first)
 curl -X POST localhost:8000/api/items \
   -H 'Content-Type: application/json' \
   -d "{\"title\":\"hello\",\"description\":\"world\",\"owner_id\":\"$USER\"}"
 
-# 3. Search items (gateway hydrates owners in a batch call)
+# Search (with owner hydration)
 curl "localhost:8000/api/items?q=hello" | jq
+
+# Watch logs (JSON, includes trace_id for Jaeger correlation)
+docker compose -f deploy/docker-compose.yml logs -f gateway
 ```
 
-## Where to see what
+## Chaos / exercise toggles
 
-| What | Where |
-|---|---|
-| Traces (distributed across all 3 services) | http://localhost:16686 — pick service `gateway` |
-| Metrics (RED + business counters) | http://localhost:9090 — try `rate(app_items_created_total[1m])` |
-| Structured logs with `trace_id` | `docker compose -f deploy/docker-compose.yml logs -f gateway` |
+Set these env vars in `deploy/docker-compose.yml` to enable planted bugs for the exercises:
 
-## How observability works
+| Variable | Effect | Used in exercise |
+|---|---|---|
+| `CHAOS_ITEMS_SEARCH_MS=300` | Adds 300ms latency to items search | Ex 3, 7 |
+| `CHAOS_USERS_GET_ERROR_RATE=0.3` | 30% of users.get requests return 500 | Ex 4 |
+| `CHAOS_GATEWAY_VALIDATE_MS=80` | Adds latency to owner-validation hop | Ex 7 |
+| `CHAOS_OS_INDEX_SLOW_MS=150` | Slows down OpenSearch index ops | — |
 
-- **Traces** — `FastAPIInstrumentor` creates a root span per request; `HTTPXClientInstrumentor` creates child spans for downstream HTTP calls and injects W3C `traceparent` headers so all 3 services share one trace. `RequestsInstrumentor` covers `opensearch-py`. Custom spans in `store.py` files add business attributes.
-- **Metrics** — Both standard HTTP server metrics (auto) and custom counters/histograms in `common/metrics.py` are exported via OTLP to the Collector, which exposes them on `:8889` for Prometheus to scrape.
-- **Logs** — `structlog` emits JSON; `LoggingInstrumentor` injects `trace_id`/`span_id` into every record. Grab a `trace_id` from a log line, paste into Jaeger search to jump to the full trace.
-- **Baggage** — Gateway sets a `request.id` in OTel baggage; it propagates automatically to downstream service spans.
+Each toggle writes a `chaos.delay_ms` / `chaos.failure` attribute onto the affected span so you can spot it in Jaeger.
+
+## Running tests
+
+```bash
+pip install -r requirements.txt
+pip install pytest
+pytest -v
+```
+
+18 tests cover every route across all 3 HTTP services. All external dependencies (OpenSearch, downstream services) are mocked.

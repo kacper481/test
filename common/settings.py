@@ -19,6 +19,7 @@ class GatewaySettings(BaseServiceSettings):
     port: int = 8000
     items_svc_url: str = "http://localhost:8001"
     users_svc_url: str = "http://localhost:8002"
+    amqp_url: str = "amqp://guest:guest@localhost:5672/"
 
 
 class ItemsSvcSettings(BaseServiceSettings):
@@ -29,3 +30,8 @@ class ItemsSvcSettings(BaseServiceSettings):
 class UsersSvcSettings(BaseServiceSettings):
     service_name: str = "users-svc"
     port: int = 8002
+
+
+class NotificationsSvcSettings(BaseServiceSettings):
+    service_name: str = "notifications-svc"
+    amqp_url: str = "amqp://guest:guest@localhost:5672/"

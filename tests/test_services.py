@@ -239,7 +239,17 @@ def _gw_http_mock():
 @pytest.fixture()
 def gw_client():
     http_mock = _gw_http_mock()
-    with patch("common.http_client.make_client", return_value=http_mock):
+
+    # Replace EventPublisher with a no-op so tests don't need RabbitMQ
+    pub_mock = MagicMock()
+    pub_mock.connect = AsyncMock()
+    pub_mock.close = AsyncMock()
+    pub_mock.publish = AsyncMock()
+
+    with (
+        patch("common.http_client.make_client", return_value=http_mock),
+        patch("services.gateway.main.EventPublisher", return_value=pub_mock),
+    ):
         import importlib
         import services.gateway.main as m
         importlib.reload(m)
@@ -289,3 +299,41 @@ def test_gw_search_items(gw_client):
     body = r.json()
     assert body["total"] == 1
     assert body["hits"][0]["owner"]["name"] == "alice"   # owner hydrated
+
+
+# ---------------------------------------------------------------------------
+# chaos module
+# ---------------------------------------------------------------------------
+
+def test_chaos_delay_skipped_when_unset(monkeypatch):
+    from common import chaos
+    monkeypatch.delenv("CHAOS_TEST_DELAY", raising=False)
+    import time
+    start = time.monotonic()
+    chaos.maybe_delay("CHAOS_TEST_DELAY")
+    assert time.monotonic() - start < 0.01
+
+
+def test_chaos_delay_sleeps_when_set(monkeypatch):
+    from common import chaos
+    monkeypatch.setenv("CHAOS_TEST_DELAY", "50")
+    import time
+    start = time.monotonic()
+    chaos.maybe_delay("CHAOS_TEST_DELAY")
+    assert time.monotonic() - start >= 0.04
+
+
+def test_chaos_fail_at_100_percent(monkeypatch):
+    from common import chaos
+    from fastapi import HTTPException
+    monkeypatch.setenv("CHAOS_TEST_FAIL", "1.0")
+    with pytest.raises(HTTPException) as exc_info:
+        chaos.maybe_fail("CHAOS_TEST_FAIL")
+    assert exc_info.value.status_code == 500
+
+
+def test_chaos_fail_at_zero_never_fires(monkeypatch):
+    from common import chaos
+    monkeypatch.setenv("CHAOS_TEST_FAIL", "0")
+    for _ in range(20):
+        chaos.maybe_fail("CHAOS_TEST_FAIL")  # must never raise

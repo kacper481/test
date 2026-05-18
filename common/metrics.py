@@ -19,10 +19,11 @@ def _histogram(name: str, description: str, unit: str):
     return _meter.create_histogram(name=name, description=description, unit=unit)
 
 
-items_created = _counter("items_created_total", "Total number of items created.")
-users_created = _counter("users_created_total", "Total number of users created.")
+items_created = _counter("items_created", "Total number of items created.")
+users_created = _counter("users_created", "Total number of users created.")
 opensearch_ops = _counter(
-    "opensearch_operations_total",
+    "opensearch_operations",
     "OpenSearch operations performed, labeled by operation and index.",
 )
 search_result_size = _histogram("search_result_size", "Number of hits returned by a search.", "hits")
+notifications_sent = _counter("notifications_sent", "Async notifications processed by the worker.")
