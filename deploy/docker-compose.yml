@@ -1,0 +1,96 @@
+version: "3.8"
+
+x-app-base: &app-base
+  build:
+    context: ..
+    dockerfile: deploy/Dockerfile
+  environment:
+    OPENSEARCH_HOST: http://opensearch:9200
+    OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+    LOG_LEVEL: INFO
+  depends_on:
+    opensearch:
+      condition: service_healthy
+    otel-collector:
+      condition: service_started
+
+services:
+  # --- Data + observability infra ---------------------------------------
+  opensearch:
+    image: opensearchproject/opensearch:2.13.0
+    environment:
+      - discovery.type=single-node
+      - DISABLE_SECURITY_PLUGIN=true
+      - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:9200/_cluster/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.60
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      - "16686:16686"   # UI
+      - "4317"          # OTLP gRPC (internal)
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.112.0
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+    ports:
+      - "4317:4317"     # OTLP gRPC ingest
+      - "4318:4318"     # OTLP HTTP ingest
+      - "8889:8889"     # Prometheus metrics
+    depends_on:
+      - jaeger
+
+  prometheus:
+    image: prom/prometheus:v2.55.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      - otel-collector
+
+  # --- Application services ---------------------------------------------
+  items-svc:
+    <<: *app-base
+    command: ["uvicorn", "services.items_svc.main:app", "--host", "0.0.0.0", "--port", "8001"]
+    ports:
+      - "8001:8001"
+
+  users-svc:
+    <<: *app-base
+    command: ["uvicorn", "services.users_svc.main:app", "--host", "0.0.0.0", "--port", "8002"]
+    ports:
+      - "8002:8002"
+
+  gateway:
+    <<: *app-base
+    environment:
+      OPENSEARCH_HOST: http://opensearch:9200
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      LOG_LEVEL: INFO
+      ITEMS_SVC_URL: http://items-svc:8001
+      USERS_SVC_URL: http://users-svc:8002
+    command: ["uvicorn", "services.gateway.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "8000:8000"
+    depends_on:
+      opensearch:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+      items-svc:
+        condition: service_started
+      users-svc:
+        condition: service_started
