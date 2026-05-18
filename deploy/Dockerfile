@@ -11,6 +11,7 @@ RUN pip install -r requirements.txt
 
 COPY common ./common
 COPY services ./services
+COPY tools ./tools
 
 # `command` in docker-compose chooses which service to run
 CMD ["uvicorn", "services.gateway.main:app", "--host", "0.0.0.0", "--port", "8000"]
