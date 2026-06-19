@@ -14,6 +14,7 @@ manager — never in env vars or .env files committed to source control.
 from __future__ import annotations
 
 import os
+import secrets
 
 from fastapi import HTTPException, Security
 from fastapi.security import APIKeyHeader
@@ -38,5 +39,5 @@ def require_api_key(provided: str | None = Security(_api_key_header)) -> None:
             detail=f"Missing {_HEADER_NAME} header",
             headers={"WWW-Authenticate": _HEADER_NAME},
         )
-    if provided != expected:
+    if not secrets.compare_digest(provided, expected):
         raise HTTPException(status_code=403, detail="Invalid API key")

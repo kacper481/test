@@ -179,14 +179,12 @@ async def search_items(
 
         owner_ids = list({hit["owner_id"] for hit in result["hits"]})
         if owner_ids:
-            with _tracer.start_as_current_span("gateway.hydrate_owners") as span:
-                span.set_attribute("hydrate.owner_count", len(owner_ids))
-                mget_resp = await http.post(
-                    f"{request.app.state.users_url}/users/_mget",
-                    json={"ids": owner_ids},
-                )
-                mget_resp.raise_for_status()
-                owners_by_id = {u["id"]: u for u in mget_resp.json()["users"]}
+            mget_resp = await http.post(
+                f"{request.app.state.users_url}/users/_mget",
+                json={"ids": owner_ids},
+            )
+            mget_resp.raise_for_status()
+            owners_by_id = {u["id"]: u for u in mget_resp.json()["users"]}
         else:
             owners_by_id = {}
 

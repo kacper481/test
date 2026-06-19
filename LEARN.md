@@ -194,29 +194,32 @@ Watch the dashboard for ~1 minute.
 
 ## Exercise 8 — Write your own span
 
-**Goal:** add a custom span with a meaningful business attribute.
+**Goal:** add a custom span with a meaningful business attribute — from scratch.
 
-Open `services/gateway/routes.py` and find the `search_items` handler.
-
-Add a custom span around the owner-hydration block:
+Open `services/gateway/routes.py` and find the `search_items` handler. Inside the `if owner_ids:` block you'll see a raw `http.post(...)` call that batch-fetches owners. Wrap it in a custom span so the owner-hydration step is visible as its own node in Jaeger:
 
 ```python
 with _tracer.start_as_current_span("gateway.hydrate_owners") as span:
     span.set_attribute("hydrate.owner_count", len(owner_ids))
-    # ... existing mget code ...
+    mget_resp = await http.post(
+        f"{request.app.state.users_url}/users/_mget",
+        json={"ids": owner_ids},
+    )
+    mget_resp.raise_for_status()
+    owners_by_id = {u["id"]: u for u in mget_resp.json()["users"]}
 ```
 
-(*One is already there — try adding a `hydrate.cache_hit: false` attribute to it.*)
+`_tracer` is already imported at the top of the file — no extra import needed.
 
-Then rebuild:
+Then rebuild and search:
 ```bash
 docker compose -f deploy/docker-compose.yml up -d --build gateway
 curl "localhost:8000/api/items?q=red"
 ```
 
-Find the trace. Your new attribute should appear in the span's tags.
+Find the trace in Jaeger. You should now see `gateway.hydrate_owners` as a child span of the search request, with `hydrate.owner_count` in its tags.
 
-**Bonus:** record the owner_count in a histogram metric (`common/metrics.py`) and query it in Prometheus.
+**Bonus:** record the `owner_count` in a histogram metric (`common/metrics.py`) and query it in Prometheus.
 
 ---
 
