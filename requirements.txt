@@ -3,6 +3,7 @@ uvicorn[standard]==0.32.1
 httpx==0.27.2
 opensearch-py==2.7.1
 aio-pika==9.5.0
+slowapi==0.1.9
 pydantic[email]==2.9.2
 pydantic-settings==2.6.1
 structlog==24.4.0

@@ -5,8 +5,11 @@ x-app-base: &app-base
   environment: &app-env
     OPENSEARCH_HOST: http://opensearch:9200
     OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
-    AMQP_URL: amqp://guest:guest@rabbitmq:5672/
+    AMQP_URL: amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASS:-guest}@rabbitmq:5672/
     LOG_LEVEL: INFO
+    # Production toggles — opt-in. See .env.example.
+    GATEWAY_API_KEY: ${GATEWAY_API_KEY:-}
+    RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-}
   mem_limit: 256m
   depends_on:
     opensearch:
@@ -34,10 +37,13 @@ services:
 
   rabbitmq:
     image: rabbitmq:3.13-management
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER:-guest}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASS:-guest}
     mem_limit: 512m
     ports:
       - "5672:5672"    # AMQP
-      - "15672:15672"  # Management UI (guest/guest)
+      - "15672:15672"  # Management UI
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "ping"]
       interval: 5s
@@ -144,6 +150,7 @@ services:
       GATEWAY_URL: http://gateway:8000
       RPS: "3"
       SCENARIO: steady    # steady | read_heavy | write_heavy | spike
+      LOADGEN_API_KEY: ${LOADGEN_API_KEY:-}
     mem_limit: 128m
     depends_on:
       gateway:

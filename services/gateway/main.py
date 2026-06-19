@@ -2,13 +2,14 @@ from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
 
+from common import rate_limit
 from common.http_client import make_client
 from common.logging import configure_logging, get_logger
 from common.settings import GatewaySettings
 from common.telemetry import configure_telemetry
 
 from .events import EventPublisher
-from .routes import router
+from .routes import api_router, router
 
 
 def create_app() -> FastAPI:
@@ -43,7 +44,9 @@ def create_app() -> FastAPI:
         log.info("service.stopped", service=settings.service_name)
 
     app = FastAPI(title="gateway", lifespan=lifespan)
+    rate_limit.install(app)
     app.include_router(router)
+    app.include_router(api_router)
     configure_telemetry(app, settings.service_name, settings.otel_exporter_otlp_endpoint)
     return app
 

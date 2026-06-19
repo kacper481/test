@@ -22,6 +22,8 @@ import httpx
 GATEWAY = os.getenv("GATEWAY_URL", "http://gateway:8000")
 RPS = float(os.getenv("RPS", "5"))
 SCENARIO = os.getenv("SCENARIO", "steady")
+API_KEY = os.getenv("LOADGEN_API_KEY") or None
+HEADERS = {"X-API-Key": API_KEY} if API_KEY else {}
 
 # action -> weight, per scenario
 WEIGHTS = {
@@ -90,7 +92,7 @@ async def run() -> None:
     sent = 0
     started = time.monotonic()
 
-    async with httpx.AsyncClient(timeout=10) as client:
+    async with httpx.AsyncClient(timeout=10, headers=HEADERS) as client:
         # Wait for gateway to be reachable
         for attempt in range(60):
             try:

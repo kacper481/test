@@ -3,15 +3,20 @@ from __future__ import annotations
 import asyncio
 import uuid
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from opentelemetry import baggage, context, trace
 from pydantic import BaseModel, EmailStr, Field
 
 from common import chaos
+from common.auth import require_api_key
 from common.logging import get_logger
 
 log = get_logger("gateway.routes")
-router = APIRouter()
+router = APIRouter()  # /health — no auth (for liveness probes)
+api_router = APIRouter(  # /api/* — protected when GATEWAY_API_KEY is set
+    prefix="/api",
+    dependencies=[Depends(require_api_key)],
+)
 _tracer = trace.get_tracer(__name__)
 
 
@@ -70,7 +75,7 @@ async def health(request: Request):
     }
 
 
-@router.post("/api/users", status_code=201)
+@api_router.post("/users", status_code=201)
 async def create_user(payload: UserCreate, request: Request):
     token = _attach_request_baggage(request)
     try:
@@ -85,7 +90,7 @@ async def create_user(payload: UserCreate, request: Request):
         context.detach(token)
 
 
-@router.get("/api/users/{user_id}")
+@api_router.get("/users/{user_id}")
 async def get_user(user_id: str, request: Request):
     token = _attach_request_baggage(request)
     try:
@@ -98,7 +103,7 @@ async def get_user(user_id: str, request: Request):
         context.detach(token)
 
 
-@router.post("/api/items", status_code=201)
+@api_router.post("/items", status_code=201)
 async def create_item(payload: ItemCreate, request: Request):
     """Validate the owner exists, then create the item — two downstream hops."""
     token = _attach_request_baggage(request)
@@ -131,7 +136,7 @@ async def create_item(payload: ItemCreate, request: Request):
         context.detach(token)
 
 
-@router.get("/api/items/{item_id}")
+@api_router.get("/items/{item_id}")
 async def get_item(item_id: str, request: Request):
     """Fetch item + owner concurrently."""
     token = _attach_request_baggage(request)
@@ -156,7 +161,7 @@ async def get_item(item_id: str, request: Request):
         context.detach(token)
 
 
-@router.get("/api/items")
+@api_router.get("/items")
 async def search_items(
     request: Request,
     q: str | None = None,

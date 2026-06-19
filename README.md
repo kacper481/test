@@ -8,7 +8,7 @@ A self-contained, multi-service Python system designed for **learning the workfl
 
 > **📚 Start with [LEARN.md](./LEARN.md)** — 8 progressive exercises that teach the actual workflow. The rest of this file is a reference.
 
-> ⚠️ **Development environment only.** OpenSearch security plugin is disabled, RabbitMQ uses default `guest`/`guest` credentials, and Grafana allows anonymous admin access — all by design for a frictionless local learning loop. **Never run this configuration in production or expose it publicly.**
+> ⚠️ **Defaults are for local learning, not production.** Out of the box the OpenSearch security plugin is disabled, RabbitMQ uses `guest`/`guest`, and Grafana allows anonymous admin — for a frictionless loop. The gateway ships with opt-in API-key auth and rate limiting (see [Security hardening](#security-hardening-opt-in)), but there's more to do before real traffic — see [What is and isn't production-ready](#what-is-and-isnt-production-ready). **Don't expose the default configuration publicly.**
 
 ## What you'll see
 
@@ -134,6 +134,53 @@ Set these env vars in `deploy/docker-compose.yml` to enable planted bugs for the
 
 Each toggle writes a `chaos.delay_ms` / `chaos.failure` attribute onto the affected span so you can spot it in Jaeger.
 
+## Security hardening (opt-in)
+
+The defaults are wide open for a frictionless learning loop. The gateway ships with two opt-in production controls — set the env var to turn each on:
+
+| Variable | Effect |
+|---|---|
+| `GATEWAY_API_KEY=<secret>` | Require an `X-API-Key: <secret>` header on every `/api/*` request (returns 401 if missing, 403 if wrong). `/health` stays open for liveness probes. |
+| `RATE_LIMIT_PER_MINUTE=<N>` | Per-client-IP rate limit; excess requests get HTTP 429. |
+| `RABBITMQ_USER` / `RABBITMQ_PASS` | Override the broker's default `guest`/`guest` credentials. |
+| `LOADGEN_API_KEY=<secret>` | Make the bundled load generator send the API key (match `GATEWAY_API_KEY`). |
+
+Example — run the stack locked down:
+
+```bash
+GATEWAY_API_KEY=$(openssl rand -hex 16) \
+RATE_LIMIT_PER_MINUTE=120 \
+RABBITMQ_USER=app RABBITMQ_PASS=$(openssl rand -hex 16) \
+docker compose -f deploy/docker-compose.yml up -d
+```
+
+These are real, tested controls (see `tests/test_security.py`) — but they are the **floor**, not a complete production posture. See the next section.
+
+## What is and isn't production-ready
+
+This project is built to *teach observability*, and it is genuinely solid in that role: real services, real instrumentation, a tested codebase, and opt-in auth/rate-limiting. But do **not** mistake "runs cleanly with `docker compose up`" for "ready to serve real traffic." Honest gaps before you'd put this in front of users:
+
+**Secrets & config**
+- Secrets live in env vars / `.env` files. Real deployments need a secret manager (Vault, AWS/GCP Secrets Manager, sealed secrets) — never secrets in compose or git.
+- No secret rotation, no per-client API keys, no key revocation. The single shared API key is a demo-grade control; real systems want OAuth2/OIDC or JWTs.
+
+**Transport & network**
+- All traffic is plaintext HTTP. Production needs TLS everywhere (a reverse proxy / ingress terminating HTTPS, and ideally mTLS between services).
+- OpenSearch runs with its security plugin **disabled** and Grafana allows **anonymous admin**. Both must be locked down with real auth before exposure.
+
+**Resilience & scale**
+- Single-node OpenSearch, single RabbitMQ, single replica per service — no high availability. Production wants clustering, replication, and multiple replicas behind a load balancer.
+- The in-memory rate limiter is per-process; with multiple gateway replicas you'd need a shared backend (e.g. Redis via slowapi's `storage_uri`).
+- No connection-retry/backoff if OpenSearch or RabbitMQ are slow to come up beyond compose healthchecks; no circuit breakers on downstream calls.
+
+**Operations**
+- No alerting or SLOs — you get dashboards, but nothing pages you. Add Alertmanager / Grafana alerts tied to the RED metrics.
+- No persistent volumes configured for OpenSearch/Prometheus data; restarts lose data.
+- Container images aren't pinned by digest, run as root, and aren't scanned. Production wants digest pins, a non-root user, and image scanning in CI.
+- Intended for Docker Compose on one host. Real deployment targets (Kubernetes, ECS) need their own manifests, probes, autoscaling, and resource requests/limits.
+
+Treat the checklist above as the roadmap from "great learning environment" to "production service."
+
 ## Running tests
 
 ```bash
@@ -142,4 +189,4 @@ pip install pytest
 pytest -v
 ```
 
-18 tests cover every route across all 3 HTTP services. All external dependencies (OpenSearch, downstream services) are mocked.
+34 tests cover every route across the 3 HTTP services, cross-process trace propagation through RabbitMQ, the chaos toggles, and the opt-in auth + rate-limiting controls. All external dependencies (OpenSearch, RabbitMQ, downstream services) are mocked.
